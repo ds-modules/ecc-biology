@@ -23,8 +23,8 @@ mutation_descriptions = {
 }
 
 mutation_options = [
-    'tp53_mut', 'pik3ca_mut', 'brca1_mut', 'brca2_mut',
-    'pten_mut', 'cdh1_mut', 'akt1_mut', 'rb1_mut', 'gata3_mut', 'map2k4_mut'
+    'tp53_mut', 'pik3ca_mut', 'brca1_mut',
+    'pten_mut', 'cdh1_mut', 'akt1_mut', 'gata3_mut', 'map2k4_mut'
 ]
 
 # Define your plotting function

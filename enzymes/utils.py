@@ -12,16 +12,23 @@ from IPython.display import display
 from ipywidgets import interact, Dropdown, IntSlider
 from IPython.display import display, clear_output
 
+def load_data():
+    df = pd.read_csv('variantAnnotations/var_drug_ann.tsv', sep='\t')
+    df = df.loc[df['Gene'] == 'CYP2D6']
+    mini_view = df[['PMID', 'Gene', 'Variant/Haplotypes' ,'Drug(s)', 'Phenotype Category', 'Significance', 'Alleles', 'Metabolizer types', 'Population types' ,'Is/Is Not associated', 'Notes']]
+    display(mini_view.tail())
+    return df
 
-def display_data_counts(df):
-    var_hap_counts = df['Variant/Haplotypes'].value_counts().head(12)
-    var_hap_counts.index = var_hap_counts.index.str.slice(0, 15) + '...'
-    alleles_counts = df['Alleles'].value_counts().head(12)
+def display_data_counts():
+    df = pd.read_csv('variantAnnotations/var_drug_ann.tsv', sep='\t')
+    df = df.loc[df['Gene'] == 'CYP2D6']
+    var_hap_counts = df['Population types'].value_counts().head(12)
+    alleles_counts = df['Metabolizer types'].value_counts().head(12)
     drugs_counts = df['Drug(s)'].value_counts().head(12)
 
-    category_counts_list = [var_hap_counts, alleles_counts, drugs_counts]
-    titles = ['Variant/Haplotypes', 'Alleles', 'Drug(s)']
-    fig, axes = plt.subplots(1, 3, figsize=(12, 4))
+    category_counts_list = [drugs_counts, var_hap_counts, alleles_counts]
+    titles = ['Drug(s)', 'Population types', 'Metabolizer types']
+    fig, axes = plt.subplots(1, 3, figsize=(10, 4))
     axes = axes.flatten()
 
     def enum(category_counts_list, titles):
@@ -32,17 +39,18 @@ def display_data_counts(df):
             ax.set_xlabel(titles[i])
 
     enum(category_counts_list, titles)
-    plt.tight_layout()
     plt.show()
 
-def display_heatmap(phenotype):
+def display_heatmap():
+    phenotype = pd.read_csv('variantAnnotations/var_pheno_ann.tsv', sep='\t')
+    phenotype = phenotype.loc[phenotype['Gene'] == 'CYP2D6']
     output = widgets.Output()
     
-    def show_heatmap(indep, top_k):
+    def show_heatmap(dep, top_k):
         with output:
             clear_output(wait=True)
             
-            dep = 'Phenotype Category'
+            indep = 'Phenotype Category'
             cross_tab = pd.crosstab(phenotype[indep], phenotype[dep])
             
             if cross_tab.empty:
@@ -67,59 +75,43 @@ def display_heatmap(phenotype):
     indep_widget = widgets.Dropdown(
         options=['Metabolizer types', 'Population types'],
         value='Population types',
-        description='Independent'
+        description='Feature'
     )
     
     topk_widget = widgets.IntSlider(
-        min=1, max=7, value=3, step=1, description='Top K'
+        min=1, max=6, value=3, step=1, description='Top K'
     )
     
     ui = widgets.VBox([indep_widget, topk_widget])
     out = widgets.interactive_output(show_heatmap, {
-        'indep': indep_widget,
+        'dep': indep_widget,
         'top_k': topk_widget
     })
     display(ui, output) 
 
-def display_population_type_data_widget(phenotype):
-    output = widgets.Output(layout=widgets.Layout(height='600px'))
+def display_population_types():
+    phenotype = pd.read_csv('variantAnnotations/var_pheno_ann.tsv', sep='\t')
+    phenotype = phenotype.loc[phenotype['Gene'] == 'CYP2D6']
+    output = widgets.Output()#layout=widgets.Layout(height='600px'))
     def plot_population_data(column):
         with output:
             clear_output(wait=True)
-            
-            healthy = phenotype[phenotype['Population types'] == 'in healthy individuals']
-            people = phenotype[phenotype['Population types'] == 'in people with']
-            children = phenotype[phenotype['Population types'] == 'in children']
-            women = phenotype[phenotype['Population types'] == 'in women']
-            if column not in phenotype.columns:
-                print(f"Column '{column}' not found in data.")
-                return
-            healthy_alleles = healthy[column].value_counts().head(12)
-            people_alleles = people[column].value_counts().head(12)
-            children_alleles = children[column].value_counts().head(12)
-            women_alleles = women[column].value_counts().head(12)
 
-            category_counts_list = [healthy_alleles, people_alleles, children_alleles, women_alleles]
-            titles = ['Healthy People', 'People with', 'Children', 'Women']
-
-            fig, axes = plt.subplots(1, 4, figsize=(16, 6))
-            axes = axes.flatten()
-
-            for i, ax in enumerate(axes):
-                category_counts_list[i].plot(kind='bar', color='skyblue', edgecolor='black', ax=ax)
-                wrapped_labels = category_counts_list[i].index
-                ax.set_xticklabels(wrapped_labels, rotation=90)
-                ax.set_title(titles[i])
-                ax.set_ylabel('Count')
-                ax.set_xlabel(column)
-
-            plt.tight_layout()
+            #if column not in phenotype.columns:
+            #    print(f"Column '{column}' not found in data.")
+            #    return
+            col = phenotype[phenotype['Population types'] == column]
+            counts = col["Phenotype Category"].value_counts().head(12)
+            fig = counts.plot(kind='bar', color='skyblue', edgecolor='black', title=f'Phenotype Category {column}')
+            plt.figure(figsize=(6, 4))
             plt.show()
     
     # Create dropdown widget for column selection
     column_widget = widgets.Dropdown(
-        options=['Phenotype Category', 'Metabolizer types'],
-        description='Column:'
+        options=['in people with', 'in women', 'in women with',
+       'in healthy individuals', 'in children with', 'in infants', 'in',
+       'in children', 'in men with', 'in men'],
+        description='Population Type:'
     )
 
     ui = widgets.VBox([column_widget])

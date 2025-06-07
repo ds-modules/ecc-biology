@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 
-Le_eda_df = pd.read_csv("eda_METABRIC.csv")
+Le_eda_df = pd.read_csv("eda_df.csv")
 
 # Important mutation gene descriptions
 mutation_descriptions = {

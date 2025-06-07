@@ -4,6 +4,7 @@ from rdkit.Chem import Draw
 import rdkit.Chem.rdCoordGen as rdCoordGen
 import ipywidgets as widgets
 from IPython.display import display
+from rdkit.Chem import AllChem
 
 ### Functions to create different molecules ###
 
@@ -141,3 +142,10 @@ def display_molecule_selector():
     
     display(dropdown, output)
     on_change(None)  # Trigger initial visualization
+
+def molecule_to_3d(molecule):
+    mol = Chem.Mol(molecule)
+    mol = AllChem.AddHs(mol, addCoords=True)
+    AllChem.EmbedMolecule(mol)
+    AllChem.MMFFOptimizeMolecule(mol)
+    return mol

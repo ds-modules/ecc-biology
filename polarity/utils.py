@@ -1,4 +1,15 @@
 # util.py
+obscure_packages = ["py3Dmol", "numpy<2"]
+
+for pkg in obscure_packages:
+    try:
+        __import__(pkg)  # check if installed
+    except ImportError:
+        print(f":warning: {pkg} not found. Installing...")
+        !pip install {pkg}
+        __import__(pkg)
+
+print(":white_check_mark: All required extra packages are ready.")
 from rdkit import Chem
 from rdkit.Chem import Draw
 import rdkit.Chem.rdCoordGen as rdCoordGen

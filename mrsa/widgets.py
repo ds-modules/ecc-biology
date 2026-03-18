@@ -1,3 +1,15 @@
+# Load data relative to this file so widgets work
+# no matter where the notebook kernel starts.
+from pathlib import Path
+
+
+DATA_DIR = Path(__file__).resolve().parent
+
+
+def _data_path(filename):
+    return DATA_DIR / filename
+
+
 # line graph widget
 def infection_rates_per_county():
     
@@ -7,12 +19,13 @@ def infection_rates_per_county():
     import matplotlib.pyplot as plt
     plt.style.use('fivethirtyeight')
     import ipywidgets as widgets
-    from ipywidgets import interact, interactive, fixed, interact_manual
+    from IPython.display import display
+    from ipywidgets import interactive
     
-    mrsa_merged = pd.read_csv('mrsa_merged.csv')
+    mrsa_merged = pd.read_csv(_data_path('mrsa_merged.csv'))
 
     def line_county(county):
-        plt.figure(figsize=(10, 5))
+        fig, ax = plt.subplots(figsize=(10, 5))
 
         # group by year and sum only the numeric Infection_Count column
         by_year = (
@@ -24,12 +37,13 @@ def infection_rates_per_county():
         x = by_year.index.tolist()
         y = by_year.values.tolist()
 
-        sns.lineplot(x=x, y=y)
+        sns.lineplot(x=x, y=y, ax=ax)
         title = 'Infection Count in '+county+' County Per Year'
-        plt.title(title)
-        plt.xlabel("Year")
-        plt.ylabel("Infection Count");
+        ax.set_title(title)
+        ax.set_xlabel("Year")
+        ax.set_ylabel("Infection Count")
         plt.show()
+        plt.close(fig)
         return 
 
     wid_1 = widgets.Dropdown(
@@ -38,7 +52,8 @@ def infection_rates_per_county():
             disabled = False
     )
 
-    interact(line_county, county = wid_1);
+    widget = interactive(line_county, county=wid_1)
+    return widget
 
     
 # widget 2
@@ -52,23 +67,25 @@ def population_v_infection_by_county():
     import ipywidgets as widgets
     from ipywidgets import interact, interactive, fixed, interact_manual
     
-    mrsa_merged = pd.read_csv('mrsa_merged.csv')
-    infec_pop_merge = pd.read_csv('infec_pop_merge.csv')
+    mrsa_merged = pd.read_csv(_data_path('mrsa_merged.csv'))
+    infec_pop_merge = pd.read_csv(_data_path('infec_pop_merge.csv'))
     
     def pop_v_infec_by_county(county):    
         df = infec_pop_merge.loc[infec_pop_merge['County'] == county]  
         p = sns.lmplot(x='Year',y='Infec_Div_Pop',data=df,ci=None,height=6,aspect=2)
         title = 'Infection Count Per 100,000 People in '+county+' County'
-        plt.title(title)
-        plt.xlabel("Year")
-        plt.ylabel("Infection Rate")
+        p.ax.set_title(title)
+        p.ax.set_xlabel("Year")
+        p.ax.set_ylabel("Infection Rate")
         plt.setp(p.ax.lines,linewidth=2)
 
         ylims = (-.1,2)
         if (df['Infec_Div_Pop'].min()>=2) and (df['Infec_Div_Pop'].max()<=4):
             ylims = (1.9,4)
 
-        plt.ylim(ylims[0],ylims[1])
+        p.ax.set_ylim(ylims[0],ylims[1])
+        plt.show()
+        plt.close(p.fig)
 
        # print('Correlation: ',df.corr()['Total_Population']['Infection_Count'])
         return 
@@ -92,8 +109,8 @@ def population_vs_infection_by_year():
     import ipywidgets as widgets
     from ipywidgets import interact, interactive, fixed, interact_manual
     
-    mrsa_merged = pd.read_csv('mrsa_merged.csv')
-    infec_pop_merge = pd.read_csv('infec_pop_merge.csv')
+    mrsa_merged = pd.read_csv(_data_path('mrsa_merged.csv'))
+    infec_pop_merge = pd.read_csv(_data_path('infec_pop_merge.csv'))
     
     def pop_v_infec_by_year(year):    
     
@@ -103,16 +120,18 @@ def population_vs_infection_by_year():
 
         p = sns.lmplot(x='pop_by_100k',y='Infection_Count',data=df,ci=None,height=6,aspect=2)
         title = 'Infection Count Across Counties in Year '+ str(year)
-        plt.title(title)
-        plt.xlabel("Total Population Unit 100,000 People")
-        plt.ylabel("Infection Count")
+        p.ax.set_title(title)
+        p.ax.set_xlabel("Total Population Unit 100,000 People")
+        p.ax.set_ylabel("Infection Count")
         plt.setp(p.ax.lines,linewidth=2)
 
-        plt.ylim(-5, 83)
+        p.ax.set_ylim(-5, 83)
 
         # compute correlation using only numeric columns
         numeric_corr = df[['pop_by_100k', 'Infection_Count']].corr()
         print('Slope of Regression Line: ', numeric_corr.loc['pop_by_100k', 'Infection_Count'])
+        plt.show()
+        plt.close(p.fig)
         return 
     
     wid_year = widgets.Dropdown(
@@ -134,7 +153,7 @@ def mrsa_scenario_widget():
     plt.style.use('fivethirtyeight')
 
     # Load the MRSA data once for use in the widget model
-    mrsa_for_model = pd.read_csv("mrsa_merged.csv")
+    mrsa_for_model = pd.read_csv(_data_path("mrsa_merged.csv"))
 
     def estimate_post_intervention_growth_from_data(intervention_year=2015):
         """Estimate an average monthly growth rate after an 'intervention year' from real MRSA data."""

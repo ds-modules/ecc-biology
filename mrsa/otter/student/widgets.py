@@ -29,6 +29,7 @@ def infection_rates_per_county():
         plt.title(title)
         plt.xlabel("Year")
         plt.ylabel("Infection Count");
+        plt.show()
         return 
 
     wid_1 = widgets.Dropdown(

@@ -143,6 +143,251 @@ def population_vs_infection_by_year():
     interact(pop_v_infec_by_year, year = wid_year);
 
 
+def census_race_totals_widget():
+    """Race + sex totals vs year: county or statewide average; shows combined total and both parts.
+
+    Matches the notebook pattern (e.g. Asian Male + Asian Female) with an option to average
+    across all counties per year.
+    """
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import ipywidgets as widgets
+    from ipywidgets import interactive
+
+    plt.style.use("fivethirtyeight")
+
+    raw = pd.read_csv(_data_path("census_bonus.csv"))
+    grouped = raw.groupby(["Year", "County"], as_index=False).sum(numeric_only=True)
+
+    # (label shown in dropdown, male column, female column) — CSV column names
+    race_pairs = [
+        ("Asian", "Asian Male", "Asian Female"),
+        ("Black", "Black Male", "Black Female"),
+        ("White", "White Male", "White Female"),
+        ("American Indian", "American Indian Male", "American Indian Female"),
+        ("Native Hawaiian", "Native Hawaiian Male", "Native Hawaiian Female"),
+        ("2+ Race", "2+ Race Male", "2+ Race Female"),
+        ("Hispanic (ethnicity)", "Hispanic Male", "Hispanic Female"),
+        ("Not Hispanic (ethnicity)", "Not Hispanic Male", "Not Hispanic Female"),
+    ]
+
+    county_options = ["All counties (average)"] + sorted(grouped["County"].unique())
+
+    def plot_race(county, race_label):
+        pair = next(p for p in race_pairs if p[0] == race_label)
+        _, male_c, female_c = pair
+
+        work = grouped[["Year", "County", male_c, female_c]].copy()
+        work["race_total"] = work[male_c] + work[female_c]
+
+        fig, ax = plt.subplots(figsize=(10, 5))
+
+        if county == "All counties (average)":
+            agg = (
+                work.groupby("Year", as_index=False)
+                .agg(
+                    avg_race_total=("race_total", "mean"),
+                    avg_male=(male_c, "mean"),
+                    avg_female=(female_c, "mean"),
+                )
+                .sort_values("Year")
+            )
+            ax.plot(agg["Year"], agg["avg_race_total"], label="Average race total (all counties)", linewidth=2.5)
+            ax.plot(agg["Year"], agg["avg_male"], label=f"Average {male_c}", alpha=0.9)
+            ax.plot(agg["Year"], agg["avg_female"], label=f"Average {female_c}", alpha=0.9)
+            title = f"{race_label}: average per year (mean across counties)"
+        else:
+            one = work.loc[work["County"] == county].sort_values("Year")
+            ax.plot(one["Year"], one["race_total"], label="Race total (male + female)", linewidth=2.5)
+            ax.plot(one["Year"], one[male_c], label=male_c, alpha=0.9)
+            ax.plot(one["Year"], one[female_c], label=female_c, alpha=0.9)
+            title = f"{race_label} in {county}"
+
+        ax.set_xlabel("Year")
+        ax.set_ylabel("Population")
+        ax.set_title(title)
+        ax.legend(loc="best", fontsize=9)
+        plt.tight_layout()
+        plt.show()
+        plt.close(fig)
+
+    county_dd = widgets.Dropdown(
+        options=county_options,
+        value=county_options[1] if len(county_options) > 1 else county_options[0],
+        description="County",
+        layout=widgets.Layout(width="420px"),
+    )
+    race_dd = widgets.Dropdown(
+        options=[p[0] for p in race_pairs],
+        value="Asian",
+        description="Group",
+        layout=widgets.Layout(width="320px"),
+    )
+
+    return interactive(plot_race, county=county_dd, race_label=race_dd)
+
+
+def census_race_multiselect_widget():
+    """Compare whole-race totals (male + female combined) on one plot with multi-select.
+
+    - Each race is a single series: Asian = Asian Male + Asian Female (same for other groups).
+    - County dropdown plus multi-select races to overlay lines.
+    - Shows a table of mean race total per county (average across years) for the selected races.
+    """
+    import numpy as np
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import ipywidgets as widgets
+    from IPython.display import clear_output, display
+
+    plt.style.use("fivethirtyeight")
+
+    raw = pd.read_csv(_data_path("census_bonus.csv"))
+    grouped = raw.groupby(["Year", "County"], as_index=False).sum(numeric_only=True)
+
+    race_pairs = [
+        ("Asian", "Asian Male", "Asian Female"),
+        ("Black", "Black Male", "Black Female"),
+        ("White", "White Male", "White Female"),
+        ("American Indian", "American Indian Male", "American Indian Female"),
+        ("Native Hawaiian", "Native Hawaiian Male", "Native Hawaiian Female"),
+        ("2+ Race", "2+ Race Male", "2+ Race Female"),
+        ("Hispanic (ethnicity)", "Hispanic Male", "Hispanic Female"),
+        ("Not Hispanic (ethnicity)", "Not Hispanic Male", "Not Hispanic Female"),
+    ]
+
+    labels = [p[0] for p in race_pairs]
+    wide = grouped[["Year", "County"]].copy()
+    for label, male_c, female_c in race_pairs:
+        wide[label] = grouped[male_c].values + grouped[female_c].values
+
+    county_options = ["All counties (average)"] + sorted(grouped["County"].unique())
+
+    county_dd = widgets.Dropdown(
+        options=county_options,
+        value=county_options[1] if len(county_options) > 1 else county_options[0],
+        description="County",
+        layout=widgets.Layout(width="420px"),
+    )
+    race_checks = []
+    default_selected = {"Asian", "Black", "White"}
+    for label in labels:
+        race_checks.append(
+            widgets.Checkbox(
+                value=label in default_selected,
+                description=label,
+                indent=False,
+                layout=widgets.Layout(width="260px"),
+            )
+        )
+    select_all_btn = widgets.Button(description="Select all", layout=widgets.Layout(width="120px"))
+    clear_all_btn = widgets.Button(description="Clear all", layout=widgets.Layout(width="120px"))
+    race_controls = widgets.VBox(
+        [
+            widgets.HTML("<b>Races</b>"),
+            widgets.HBox([select_all_btn, clear_all_btn]),
+            widgets.VBox(race_checks),
+        ],
+        layout=widgets.Layout(width="380px"),
+    )
+    out = widgets.Output()
+
+    def selected_races():
+        return tuple(cb.description for cb in race_checks if cb.value)
+
+    def render(county, race_labels):
+        with out:
+            clear_output(wait=True)
+            if not race_labels:
+                display(
+                    widgets.HTML(
+                        "<p><b>Select at least one race</b> using the checkboxes.</p>"
+                    )
+                )
+                return
+
+            fig, ax = plt.subplots(figsize=(11, 5))
+            n = len(race_labels)
+            colors = plt.cm.tab10(np.linspace(0, 1, max(n, 1)))
+
+            if county == "All counties (average)":
+                for i, race in enumerate(race_labels):
+                    agg = (
+                        wide.groupby("Year")[race]
+                        .mean()
+                        .reset_index()
+                        .sort_values("Year")
+                    )
+                    ax.plot(
+                        agg["Year"],
+                        agg[race],
+                        label=f"{race} (mean across counties)",
+                        color=colors[i % 10],
+                        linewidth=2,
+                    )
+                overall_all = wide.groupby("Year")[labels].mean().mean(axis=1).reset_index()
+                overall_all.columns = ["Year", "overall_avg_all_races"]
+                ax.plot(
+                    overall_all["Year"],
+                    overall_all["overall_avg_all_races"],
+                    color="black",
+                    linewidth=3,
+                    linestyle="--",
+                    label="Overall average across all races",
+                )
+                ax.set_title("Mean whole-race total per year (averaged across counties)")
+            else:
+                sub = wide.loc[wide["County"] == county].sort_values("Year")
+                for i, race in enumerate(race_labels):
+                    ax.plot(
+                        sub["Year"],
+                        sub[race],
+                        label=race,
+                        color=colors[i % 10],
+                        linewidth=2.4,
+                    )
+                overall_county = sub[labels].mean(axis=1)
+                ax.plot(
+                    sub["Year"],
+                    overall_county,
+                    color="black",
+                    linewidth=3,
+                    linestyle="--",
+                    label="Overall average across all races",
+                )
+                ax.set_title(f"Whole-race totals (male + female) — {county}")
+
+            ax.set_xlabel("Year")
+            ax.set_ylabel("Population (race total)")
+            ax.legend(loc="best", fontsize=11)
+            plt.tight_layout()
+            plt.show()
+            plt.close(fig)
+
+    def refresh(_=None):
+        render(county_dd.value, selected_races())
+
+    def on_select_all(_):
+        for cb in race_checks:
+            cb.value = True
+        refresh()
+
+    def on_clear_all(_):
+        for cb in race_checks:
+            cb.value = False
+        refresh()
+
+    county_dd.observe(refresh, names="value")
+    for cb in race_checks:
+        cb.observe(refresh, names="value")
+    select_all_btn.on_click(on_select_all)
+    clear_all_btn.on_click(on_clear_all)
+
+    refresh()
+
+    return widgets.VBox([widgets.HBox([county_dd, race_controls]), out])
+
+
 # Part 9: MRSA scenario modeling widget
 def mrsa_scenario_widget():
     import numpy as np

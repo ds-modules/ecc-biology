@@ -2,7 +2,7 @@
 
 Repository for Biology Modules for El Camino College
 
-Materials created by Suparna Kompalli, Brandon Concepcion, and Jonathan Ferrari
+Materials created by Suparna Kompalli, Brandon Concepcion, Ariana Ghimire, and Jonathan Ferrari
 
 ![img](https://raw.githubusercontent.com/ds-modules/ecc-textbook/refs/heads/main/modules/_static/ecc-header.png)
 

@@ -14,4 +14,4 @@ Materials created by Suparna Kompalli, Brandon Concepcion, Ariana Ghimire, and J
 
 ## Launch Cancer & Mutations notebook on DataHub: [![Repo on DataHub](https://img.shields.io/badge/Launch-El%20Camino%20College%20Datahub-blue.svg)](https://elcamino.cloudbank.2i2c.cloud/hub/user-redirect/git-pull?repo=https%3A%2F%2Fgithub.com%2Fds-modules%2Fecc-biology&branch=main&urlpath=tree%2Fecc-biology%2FCancer_Mutations%2Fcancer_mutations.ipynb)
 
-## Launch MRSA Data Analysis notebook on DataHub: [![Repo on DataHub](https://elcamino.cloudbank.2i2c.cloud/hub/user-redirect/git-pull?repo=https%3A%2F%2Fgithub.com%2Fds-modules%2Fecc-biology&branch=main&urlpath=tree%2Fecc-biology%2Fmrsa%2Fotter%2Fstudent%2FMRSA+Data+Analysis.ipynb)
+## Launch MRSA Data Analysis notebook on DataHub: [![Repo on DataHub](https://img.shields.io/badge/Launch-El%20Camino%20College%20Datahub-blue.svg)](https://elcamino.cloudbank.2i2c.cloud/hub/user-redirect/git-pull?repo=https%3A%2F%2Fgithub.com%2Fds-modules%2Fecc-biology&branch=main&urlpath=tree%2Fecc-biology%2Fmrsa%2Fotter%2Fstudent%2FMRSA+Data+Analysis.ipynb)

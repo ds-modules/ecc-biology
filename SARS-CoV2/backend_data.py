@@ -215,134 +215,128 @@ def explain_regression_plot_for_students() -> None:
     display(Markdown(text))
 
 
-def show_interactive_prediction_widget(
-    df: pd.DataFrame, model_df: pd.DataFrame, slope: float, intercept: float
+def _format_prediction_summary(
+    title: str,
+    wastewater: float,
+    predicted_cases: float,
+    actual_cases: float | None = None,
+    location: str | None = None,
+    sample_date: str | None = None,
+) -> str:
+    """Build a short markdown summary for the prediction explorer."""
+    lines = [f"### {title}", ""]
+    if sample_date:
+        lines.append(f"- **Sampling date:** {sample_date}")
+    if location:
+        lines.append(f"- **Location label:** {location}")
+    lines.extend(
+        [
+            f"- **Wastewater concentration (copies/L):** {wastewater:,.1f}",
+            f"- **Model prediction (rolling-average cases):** {predicted_cases:,.1f}",
+        ]
+    )
+    if actual_cases is not None:
+        residual = actual_cases - predicted_cases
+        lines.append(f"- **Actual reported cases:** {actual_cases:,.1f}")
+        lines.append(f"- **Difference (actual − predicted):** {residual:+,.1f}")
+        if residual > 0:
+            compare = "higher than"
+        elif residual < 0:
+            compare = "lower than"
+        else:
+            compare = "equal to"
+        lines.append(
+            f"\nOn this date, reported cases were **{compare}** what the simple model expected."
+        )
+    else:
+        lines.append(
+            "\nThis is a **what-if scenario** from the dataset's wastewater range "
+            "(not one specific sampling week). Use the regression graph above to see where it falls on the line."
+        )
+    return "\n".join(lines)
+
+
+def show_prediction_explorer_widget(
+    df: pd.DataFrame, slope: float, intercept: float
 ) -> None:
-    """Render interactive sliders and dynamic regression prediction plot."""
-    norm_min = float(np.nanpercentile(df["normalized_conc_copies_per_L"], 5))
-    norm_max = float(np.nanpercentile(df["normalized_conc_copies_per_L"], 95))
-    raw_min = float(np.nanpercentile(df["sarscov2_copies_per_mL_kit_raw"], 5))
-    raw_max = float(np.nanpercentile(df["sarscov2_copies_per_mL_kit_raw"], 95))
+    """Dropdown explorer: compare model predictions for scenarios or real samples."""
+    conc = df["normalized_conc_copies_per_L"].dropna()
+    scenario_options = {
+        "Scenario — low wastewater (10th percentile)": float(np.nanpercentile(conc, 10)),
+        "Scenario — typical wastewater (median)": float(np.nanmedian(conc)),
+        "Scenario — high wastewater (90th percentile)": float(np.nanpercentile(conc, 90)),
+    }
 
-    median_conversion = np.nanmedian(
-        df["normalized_conc_copies_per_L"] / df["sarscov2_copies_per_mL_kit_raw"]
+    samples = (
+        df[
+            [
+                "sampling_date",
+                "fig1_label",
+                "normalized_conc_copies_per_L",
+                "rolling_average_new_cases_centered",
+            ]
+        ]
+        .dropna()
+        .sort_values("sampling_date")
     )
+    sample_options: dict[str, int] = {}
+    for idx, row in samples.iterrows():
+        date_str = pd.Timestamp(row["sampling_date"]).strftime("%Y-%m-%d")
+        label = str(row["fig1_label"])
+        key = f"{date_str} — {label}"
+        if key not in sample_options:
+            sample_options[key] = idx
 
-    norm_slider = widgets.FloatSlider(
-        value=float(np.nanmedian(df["normalized_conc_copies_per_L"])),
-        min=norm_min,
-        max=norm_max,
-        step=(norm_max - norm_min) / 100,
-        description="Normalized:",
-        readout_format=".1f",
-        layout=widgets.Layout(width="85%"),
+    all_options = {**scenario_options, **sample_options}
+    picker = widgets.Dropdown(
+        options=list(all_options.keys()),
+        description="Explore:",
+        layout=widgets.Layout(width="95%"),
     )
+    result_output = widgets.Output()
 
-    raw_slider = widgets.FloatSlider(
-        value=float(np.nanmedian(df["sarscov2_copies_per_mL_kit_raw"])),
-        min=raw_min,
-        max=raw_max,
-        step=(raw_max - raw_min) / 100,
-        description="Raw SARS:",
-        readout_format=".1f",
-        layout=widgets.Layout(width="85%"),
-    )
+    def refresh(change=None):
+        with result_output:
+            result_output.clear_output()
+            choice = picker.value
+            wastewater = float(
+                df.loc[all_options[choice], "normalized_conc_copies_per_L"]
+                if choice in sample_options
+                else scenario_options[choice]
+            )
+            predicted = slope * wastewater + intercept
 
-    use_raw_toggle = widgets.Checkbox(
-        value=False,
-        description="Use raw SARS slider instead of normalized slider",
-    )
-
-    prediction_output = widgets.Output()
-
-    def update_prediction(change=None):
-        with prediction_output:
-            prediction_output.clear_output()
-
-            if use_raw_toggle.value:
-                x_input = raw_slider.value * median_conversion
-                source_text = (
-                    "raw SARS value converted to an approximate normalized concentration"
+            if choice in sample_options:
+                row = df.loc[all_options[choice]]
+                display(
+                    Markdown(
+                        _format_prediction_summary(
+                            title=choice,
+                            wastewater=wastewater,
+                            predicted_cases=predicted,
+                            actual_cases=float(row["rolling_average_new_cases_centered"]),
+                            location=str(row["fig1_label"]),
+                            sample_date=pd.Timestamp(row["sampling_date"]).strftime(
+                                "%Y-%m-%d"
+                            ),
+                        )
+                    )
                 )
             else:
-                x_input = norm_slider.value
-                source_text = "normalized concentration slider"
+                display(
+                    Markdown(
+                        _format_prediction_summary(
+                            title=choice,
+                            wastewater=wastewater,
+                            predicted_cases=predicted,
+                        )
+                    )
+                )
 
-            y_pred = slope * x_input + intercept
+    picker.observe(refresh, names="value")
+    display(picker, result_output)
+    refresh()
 
-            print(f"Input source: {source_text}")
-            print(f"Model input (x): {x_input:.2f}")
-            print(f"Predicted rolling-average cases (y): {y_pred:.2f}")
 
-            plt.figure(figsize=(10, 5))
-            plt.scatter(
-                model_df["normalized_conc_copies_per_L"],
-                model_df["rolling_average_new_cases_centered"],
-                alpha=0.35,
-                color="steelblue",
-                label="Observed points",
-            )
-            x_line = np.linspace(
-                model_df["normalized_conc_copies_per_L"].min(),
-                model_df["normalized_conc_copies_per_L"].max(),
-                200,
-            )
-            y_line = slope * x_line + intercept
-            plt.plot(
-                x_line,
-                y_line,
-                color="darkorange",
-                linewidth=2,
-                label="Best-fit line",
-            )
-            plt.scatter(
-                [x_input],
-                [y_pred],
-                color="crimson",
-                s=110,
-                zorder=5,
-                label="Your selected prediction",
-            )
-
-            plt.axvline(
-                x=x_input,
-                color="purple",
-                linestyle="--",
-                linewidth=1.5,
-                alpha=0.8,
-            )
-            plt.axhline(
-                y=y_pred,
-                color="green",
-                linestyle="--",
-                linewidth=1.5,
-                alpha=0.8,
-            )
-            plt.annotate(
-                f"(x={x_input:.1f}, y={y_pred:.1f})",
-                (x_input, y_pred),
-                textcoords="offset points",
-                xytext=(10, 10),
-                ha="left",
-                fontsize=9,
-                bbox={"boxstyle": "round,pad=0.3", "fc": "white", "alpha": 0.8},
-            )
-
-            x_span = x_line.max() - x_line.min()
-            local_half_window = max(0.08 * x_span, 1.0)
-            x_left = max(x_line.min(), x_input - local_half_window)
-            x_right = min(x_line.max(), x_input + local_half_window)
-            plt.xlim(x_left, x_right)
-
-            plt.xlabel("Normalized concentration (copies/L)")
-            plt.ylabel("Rolling average of new cases")
-            plt.title("Interactive prediction on the regression line")
-            plt.legend(loc="best")
-            plt.tight_layout()
-            plt.show()
-
-    for widget in [norm_slider, raw_slider, use_raw_toggle]:
-        widget.observe(update_prediction, names="value")
-
-    display(norm_slider, raw_slider, use_raw_toggle, prediction_output)
-    update_prediction()
+# Older notebook imports / cached kernels may still reference this name.
+show_interactive_prediction_widget = show_prediction_explorer_widget
